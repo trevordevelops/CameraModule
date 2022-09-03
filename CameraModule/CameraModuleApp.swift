@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct CameraModuleApp: App {
+    @StateObject var dataController = DataController()
+    let cvm = CameraViewModel()
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            CameraView()
+                .environment(\.managedObjectContext, dataController.container.viewContext)
+                .environmentObject(cvm)
         }
     }
 }

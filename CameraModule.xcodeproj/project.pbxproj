@@ -8,17 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		991255DA28C2731C00A86E7E /* CameraModuleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991255D928C2731C00A86E7E /* CameraModuleApp.swift */; };
-		991255DC28C2731C00A86E7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991255DB28C2731C00A86E7E /* ContentView.swift */; };
+		991255DC28C2731C00A86E7E /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991255DB28C2731C00A86E7E /* CameraView.swift */; };
 		991255DE28C2731D00A86E7E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 991255DD28C2731D00A86E7E /* Assets.xcassets */; };
 		991255E128C2731D00A86E7E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 991255E028C2731D00A86E7E /* Preview Assets.xcassets */; };
+		991255E828C2733900A86E7E /* CameraViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991255E728C2733900A86E7E /* CameraViewModel.swift */; };
+		991255EB28C2E12B00A86E7E /* Gallery.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 991255E928C2E12B00A86E7E /* Gallery.xcdatamodeld */; };
+		991255ED28C2E19F00A86E7E /* DataController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991255EC28C2E19F00A86E7E /* DataController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		991255D628C2731C00A86E7E /* CameraModule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CameraModule.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		991255D928C2731C00A86E7E /* CameraModuleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModuleApp.swift; sourceTree = "<group>"; };
-		991255DB28C2731C00A86E7E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		991255DB28C2731C00A86E7E /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		991255DD28C2731D00A86E7E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		991255E028C2731D00A86E7E /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		991255E728C2733900A86E7E /* CameraViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraViewModel.swift; sourceTree = "<group>"; };
+		991255EA28C2E12B00A86E7E /* Gallery.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Gallery.xcdatamodel; sourceTree = "<group>"; };
+		991255EC28C2E19F00A86E7E /* DataController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,7 +58,10 @@
 			isa = PBXGroup;
 			children = (
 				991255D928C2731C00A86E7E /* CameraModuleApp.swift */,
-				991255DB28C2731C00A86E7E /* ContentView.swift */,
+				991255DB28C2731C00A86E7E /* CameraView.swift */,
+				991255E728C2733900A86E7E /* CameraViewModel.swift */,
+				991255EC28C2E19F00A86E7E /* DataController.swift */,
+				991255E928C2E12B00A86E7E /* Gallery.xcdatamodeld */,
 				991255DD28C2731D00A86E7E /* Assets.xcassets */,
 				991255DF28C2731D00A86E7E /* Preview Content */,
 			);
@@ -137,8 +146,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				991255DC28C2731C00A86E7E /* ContentView.swift in Sources */,
+				991255ED28C2E19F00A86E7E /* DataController.swift in Sources */,
+				991255EB28C2E12B00A86E7E /* Gallery.xcdatamodeld in Sources */,
+				991255DC28C2731C00A86E7E /* CameraView.swift in Sources */,
 				991255DA28C2731C00A86E7E /* CameraModuleApp.swift in Sources */,
+				991255E828C2733900A86E7E /* CameraViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,11 +282,16 @@
 				DEVELOPMENT_TEAM = K6YSU2X7G3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is needed to capture content.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone is needed to record audio for video content.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -284,7 +301,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -299,11 +316,16 @@
 				DEVELOPMENT_TEAM = K6YSU2X7G3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is needed to capture content.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone is needed to record audio for video content.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -313,7 +335,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -339,6 +361,19 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCVersionGroup section */
+		991255E928C2E12B00A86E7E /* Gallery.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				991255EA28C2E12B00A86E7E /* Gallery.xcdatamodel */,
+			);
+			currentVersion = 991255EA28C2E12B00A86E7E /* Gallery.xcdatamodel */;
+			path = Gallery.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = 991255CE28C2731C00A86E7E /* Project object */;
 }
