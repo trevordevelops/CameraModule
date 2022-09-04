@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import CoreData
 import AVFoundation
-import AVKit
 
 struct CameraView: View {
+    @Environment(\.managedObjectContext) var moc
     @EnvironmentObject var cvm: CameraViewModel
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(key: "capturedDate", ascending: true)]) var capturedMedias: FetchedResults<CapturedMedia>
     @State private var isNotchDevice: Bool = true
     private let aspectRatio: CGFloat = 3 / 4
     private let spacing: CGFloat = 15
@@ -19,27 +21,56 @@ struct CameraView: View {
             let geoSize = geo.size
             let previewFrame = CGRect(x: 0, y: 0, width: geoSize.width, height: geoSize.width / aspectRatio)
             Color.black.ignoresSafeArea()
-            VStack(alignment: .center) {
-                if isNotchDevice { Spacer() }
-                
-                CustomCameraView(frame: previewFrame)
-                    .frame(width: previewFrame.width, height: previewFrame.height)
-                    .overlay(cvm.isCapturingPhoto ? Color.black : Color.clear)
-                    .overlay(Color.white.opacity(cvm.preferredCameraPosition == .front && cvm.flashMode == .on && (cvm.isCapturingPhoto || cvm.isRecording) ? 0.9 : 0.0))
-                    .overlay(ZStack { if !isNotchDevice { topControls } })
-                
-                contentCaptureMode
-                bottomInteractionButtons
-                
-                
-                Spacer()
+            if cvm.setupResult == .success {
+                VStack(alignment: .center) {
+                    if isNotchDevice { Spacer() }
+                    
+                    CustomCameraView(frame: previewFrame)
+                        .frame(width: previewFrame.width, height: previewFrame.height)
+                        .overlay(cvm.isCapturingPhoto ? Color.black : Color.clear)
+                        .overlay(Color.white.opacity(cvm.preferredCameraPosition == .front && cvm.flashMode == .on && (cvm.isCapturingPhoto || cvm.isRecording) ? 0.9 : 0.0))
+                        .overlay(ZStack { if !isNotchDevice { topControls } })
+                    
+                    contentCaptureMode
+                    bottomInteractionButtons
+                    
+                    Spacer()
+                }
+                .foregroundColor(.white)
+                .frame(width: geoSize.width, height: geoSize.height)
+                .overlay(ZStack { if isNotchDevice { topControls } })
+                .onAppear { isNotchDevice = geo.safeAreaInsets.bottom > 0 }
+            } else {
+                VStack(alignment: .center, spacing: spacing) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 56))
+                    Text("Uh oh!")
+                        .font(.title2)
+                    Text("You need to enable camera or microphone permissions in settings.")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .padding(spacing)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            if UIApplication.shared.canOpenURL(url) {
+                                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                            }
+                        }
+                    } label: {
+                        Text("Open Settings")
+                            .font(.headline.bold())
+                            .padding(.horizontal, spacing)
+                            .padding(.vertical, spacing / 2)
+                            .background(Color.blue)
+                            .cornerRadius(spacing)
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(width: geoSize.width, height: geoSize.height, alignment: .center)
             }
-            .foregroundColor(.white)
-            .frame(width: geoSize.width, height: geoSize.height)
-            .overlay(ZStack { if isNotchDevice { topControls } })
-            .onAppear { isNotchDevice = geo.safeAreaInsets.bottom > 0 }
         }
         .onAppear {
+            cvm.moc = moc
             cvm.endTimer()
             cvm.checkForCameraPermissions()
         }
@@ -128,9 +159,17 @@ struct CameraView: View {
                 guard !cvm.isRecording && !cvm.isCapturingPhoto else { return }
                 cvm.showGallery = true
             } label: {
-                RoundedRectangle(cornerRadius: (spacing / 2))
-                    .fill(.red)
-                    .frame(width: 48, height: 48)
+                if let last = capturedMedias.last, let data = last.image, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: spacing / 2))
+                } else {
+                    RoundedRectangle(cornerRadius: spacing / 2)
+                        .stroke(.gray, lineWidth: 1)
+                        .frame(width: 48, height: 48)
+                }
             }
             .padding(spacing)
             .sheet(isPresented: $cvm.showGallery) {
@@ -192,14 +231,6 @@ struct CameraView: View {
             }
         }
         .padding(.vertical, (spacing / 2))
-    }
-}
-
-struct GalleryView: View {
-    var body: some View {
-        ZStack {
-            Text("HELLO")
-        }
     }
 }
 

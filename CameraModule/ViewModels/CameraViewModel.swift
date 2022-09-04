@@ -7,9 +7,11 @@
 
 import SwiftUI
 import Photos
+import CoreData
 import AVFoundation
 
 class CameraViewModel: NSObject, ObservableObject {
+    @Published var moc: NSManagedObjectContext? = nil
     @Published var videoModeEnabled: Bool = false
     @Published var isRecording: Bool = false
     @Published var isCapturingPhoto: Bool = false
@@ -26,11 +28,11 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()
     @Published var videoGravity: AVLayerVideoGravity = .resizeAspect
     @Published var videoQuality: AVCaptureSession.Preset = .photo
+    @Published var setupResult: SessionSetupResult = .success
     private var audioDeviceInput: AVCaptureDeviceInput!
-    private var setupResult: SessionSetupResult = .success
     private var videoDeviceInput: AVCaptureDeviceInput!
     private let sessionQueue = DispatchQueue(label: "session queue")
-    private enum SessionSetupResult {
+    public enum SessionSetupResult {
         case success
         case notAuthorized
         case configurationFailed
@@ -40,7 +42,17 @@ class CameraViewModel: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             break
-        case .notDetermined:
+        case .restricted, .denied, .notDetermined:
+            sessionQueue.suspend()
+            AVCaptureDevice.requestAccess(for: .video, completionHandler: { granted in
+                if !granted {
+                    DispatchQueue.main.async {
+                        self.setupResult = .notAuthorized
+                    }
+                }
+                self.sessionQueue.resume()
+            })
+        default:
             sessionQueue.suspend()
             AVCaptureDevice.requestAccess(for: .video, completionHandler: { granted in
                 if !granted {
@@ -48,8 +60,6 @@ class CameraViewModel: NSObject, ObservableObject {
                 }
                 self.sessionQueue.resume()
             })
-        default:
-            setupResult = .notAuthorized
         }
         sessionQueue.async {
             self.configureSession()
@@ -118,7 +128,7 @@ class CameraViewModel: NSObject, ObservableObject {
         self.addMovieOutput()
         self.session.commitConfiguration()
         self.session.startRunning()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.canRotateCamera = true
         }
     }
@@ -241,9 +251,6 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
         guard !isCapturingPhoto else { return }
         self.sessionQueue.async {
             do {
-                DispatchQueue.main.async {
-                    self.isCapturingPhoto = true
-                }
                 let captureDevice = self.videoDeviceInput.device
                 try captureDevice.lockForConfiguration()
                 let photoSettings = AVCapturePhotoSettings()
@@ -251,6 +258,12 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
                     photoSettings.flashMode = self.flashMode
                 }
                 self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
+                DispatchQueue.main.async {
+                    self.isCapturingPhoto = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        self.isCapturingPhoto = false
+                    }
+                }
             } catch {
                 print("Error taking photo: \(error)")
             }
@@ -258,33 +271,38 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
     }
     
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let photoData = photo.fileDataRepresentation() else {
-            self.isCapturingPhoto = false
-            return
-        }
+        guard let photoData = photo.fileDataRepresentation() else { return }
         let dataProvider = CGDataProvider(data: photoData as CFData)
-        guard let cgImageRef = CGImage(jpegDataProviderSource: dataProvider!, decode: nil, shouldInterpolate: true, intent: CGColorRenderingIntent.defaultIntent) else {
-            self.isCapturingPhoto = false
-            return
+        guard let cgImageRef = CGImage(jpegDataProviderSource: dataProvider!, decode: nil, shouldInterpolate: true, intent: CGColorRenderingIntent.defaultIntent) else { return }
+        self.savePhotoToCoreData(uiImage: getUIImageFromCGImage(cgImage: cgImageRef))
+    }
+    
+    private func getUIImageFromCGImage(cgImage: CGImage) -> UIImage {
+        switch UIDevice.current.orientation {
+        case .portrait:
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .leftMirrored : .right)
+        case .landscapeLeft:
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .downMirrored : .up)
+        case .landscapeRight:
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .upMirrored : .up)
+        case .portraitUpsideDown:
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .left : .right)
+        default:
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .leftMirrored : .right)
         }
-        
-        DispatchQueue.main.async {
-            var uiImage: UIImage!
-            switch UIDevice.current.orientation {
-            case .portrait:
-                uiImage = UIImage(cgImage: cgImageRef, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .leftMirrored : .right)
-            case .landscapeLeft:
-                uiImage = UIImage(cgImage: cgImageRef, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .downMirrored : .up)
-            case .landscapeRight:
-                uiImage = UIImage(cgImage: cgImageRef, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .upMirrored : .up)
-            case .portraitUpsideDown:
-                uiImage = UIImage(cgImage: cgImageRef, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .left : .right)
-            default:
-                uiImage = UIImage(cgImage: cgImageRef, scale: 1.0, orientation: self.preferredCameraPosition == .front ? .leftMirrored : .right)
-            }
-            
-            self.savePhoto(uiImage)
-            self.isCapturingPhoto = false
+    }
+    
+    private func savePhotoToCoreData(uiImage: UIImage) {
+        guard let moc = moc else { return }
+        do {
+            let data = uiImage.jpegData(compressionQuality: 1.0)
+            let media = CapturedMedia(context: moc)
+            media.id = UUID()
+            media.image = data
+            media.capturedDate = Date()
+            try moc.save()
+        } catch {
+            print("Error saving photo to core data: \(error)")
         }
     }
     
@@ -349,17 +367,25 @@ extension CameraViewModel: AVCaptureFileOutputRecordingDelegate {
     
     /// - Tag: DidFinishRecording
     public func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        DispatchQueue.main.async {
-//            self.videoPlayerURL = outputFileURL
-//            self.getUploadReadyURL(url: outputFileURL) { url, thumbnail in
-//                DispatchQueue.main.async {
-//                    self.uploadReadyLiveURL = url
-//                    self.liveMomentThumbnail = thumbnail
-//                }
-//            }
-            self.saveMovieToCameraRoll(url: outputFileURL, error: error) { didSave in
-                print(didSave)
-            }
+        saveMovieToCoreData(url: outputFileURL)
+    }
+    
+    private func saveMovieToCoreData(url: URL) {
+        guard let moc = moc else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let media = CapturedMedia(context: moc)
+            let asset = AVURLAsset(url: url)
+            let imageGenerator = AVAssetImageGenerator(asset: asset)
+            let thumbnailCGImage = try imageGenerator.copyCGImage(at: CMTimeMake(value: 1, timescale: 60), actualTime: nil)
+            let thumbnailUIImage = getUIImageFromCGImage(cgImage: thumbnailCGImage)
+            media.id = UUID()
+            media.movie = data
+            media.image = thumbnailUIImage.jpegData(compressionQuality: 1.0)
+            media.capturedDate = Date()
+            try moc.save()
+        } catch {
+            print("Error saving movie to core data: \(error)")
         }
     }
     
@@ -391,65 +417,6 @@ extension CameraViewModel: AVCaptureFileOutputRecordingDelegate {
                 completion(success)
             })
         }
-    }
-    
-    private func getUploadReadyURL(url: URL, completion: @escaping (_ url: URL, _ thumbnail: UIImage) -> Void) {
-        do {
-            let asset = AVAsset(url: url)
-            let imgGenerator = AVAssetImageGenerator(asset: asset)
-            imgGenerator.appliesPreferredTrackTransform = true
-            let cgImage = try imgGenerator.copyCGImage(at: CMTimeMake(value: 0, timescale: 1), actualTime: nil)
-            let thumbnail = UIImage(cgImage: cgImage)
-            
-            var layerInstructionsArray: [AVVideoCompositionLayerInstruction] = []
-            guard let videoTrack = asset.tracks(withMediaType: .video).first else { return }
-            guard let audioTrack = asset.tracks(withMediaType: .audio).first else { return }
-            let speedComp = AVMutableComposition()
-            guard let speedVideo = speedComp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
-            guard let speedAudio = speedComp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
-            speedVideo.preferredTransform = videoTrack.preferredTransform
-            let transforms = videoTrack.preferredTransform
-            let assetTimeRange = CMTimeRange(start: .zero, duration: asset.duration)
-            try speedVideo.insertTimeRange(assetTimeRange, of: videoTrack, at: .zero)
-            try speedAudio.insertTimeRange(assetTimeRange, of: audioTrack, at: .zero)
-            
-            let vidInstruct = AVMutableVideoCompositionLayerInstruction()
-            vidInstruct.setTransform(transforms, at: .zero)
-            layerInstructionsArray.append(vidInstruct)
-            
-            let mainInstruct = AVMutableVideoCompositionInstruction()
-            mainInstruct.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
-            mainInstruct.layerInstructions = layerInstructionsArray
-            
-            let mainComp = AVMutableVideoComposition()
-            mainComp.instructions = [mainInstruct]
-            mainComp.frameDuration = CMTimeMake(value: 1, timescale: 20)
-            mainComp.renderSize = CGSize(width: 1080, height: 1920)
-            
-            let documentDirectory = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateStyle = .long
-            dateFormatter.timeStyle = .long
-            let date = dateFormatter.string(from: NSDate() as Date)
-            let savePath = (documentDirectory as NSString).appendingPathComponent("hudle-\(date).mp4")
-            let url = NSURL(fileURLWithPath: savePath)
-            
-            guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1920x1080) else { return }
-            exporter.outputURL = url as URL
-            exporter.outputFileType = .mp4
-            exporter.shouldOptimizeForNetworkUse = true
-            exporter.exportAsynchronously {
-                guard let url = exporter.outputURL else {
-                    print("ERROR")
-                    return
-                }
-                completion(url, thumbnail)
-            }
-        } catch {
-            print("ERROR")
-        }
-        
-        
     }
     
     private func cleanupFileManagerToSaveNewFile(outputFileURL: URL) {
