@@ -27,7 +27,7 @@ class CameraViewModel: NSObject, ObservableObject {
     @Published var preferredStartingCameraType: AVCaptureDevice.DeviceType = .builtInWideAngleCamera
     @Published var session = AVCaptureSession()
     @Published var videoGravity: AVLayerVideoGravity = .resizeAspect
-    @Published var videoQuality: AVCaptureSession.Preset = .photo
+    @Published var videoQuality: AVCaptureSession.Preset = .high
     @Published var setupResult: SessionSetupResult = .success
     private var audioDeviceInput: AVCaptureDeviceInput!
     private var videoDeviceInput: AVCaptureDeviceInput!
@@ -167,8 +167,10 @@ class CameraViewModel: NSObject, ObservableObject {
     private func addAudioDevice() {
         do {
             guard let audioDevice = AVCaptureDevice.default(for: .audio) else {
-                setupResult = .configurationFailed
-                self.session.commitConfiguration()
+                DispatchQueue.main.async {
+                    self.setupResult = .configurationFailed
+                    self.session.commitConfiguration()
+                }
                 return
             }
             
@@ -274,7 +276,8 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
         guard let photoData = photo.fileDataRepresentation() else { return }
         let dataProvider = CGDataProvider(data: photoData as CFData)
         guard let cgImageRef = CGImage(jpegDataProviderSource: dataProvider!, decode: nil, shouldInterpolate: true, intent: CGColorRenderingIntent.defaultIntent) else { return }
-        self.savePhotoToCoreData(uiImage: getUIImageFromCGImage(cgImage: cgImageRef))
+        let uiImage = getUIImageFromCGImage(cgImage: cgImageRef)
+        self.savePhotoToCoreData(uiImage: uiImage)
     }
     
     private func getUIImageFromCGImage(cgImage: CGImage) -> UIImage {
@@ -301,6 +304,7 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
             media.image = data
             media.capturedDate = Date()
             try moc.save()
+            self.savePhoto(uiImage)
         } catch {
             print("Error saving photo to core data: \(error)")
         }
@@ -334,9 +338,10 @@ extension CameraViewModel: AVCaptureFileOutputRecordingDelegate {
                 if availableVideoCodecTypes.contains(.hevc) {
                     self.movieFileOutput.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: movieFileOutputConnection!)
                 }
-                let outputFileName = NSUUID().uuidString
-                let outputFilePath = (NSTemporaryDirectory() as NSString).appendingPathComponent((outputFileName as NSString).appendingPathExtension("mov")!)
-                self.movieFileOutput.startRecording(to: URL(fileURLWithPath: outputFilePath), recordingDelegate: self)
+                
+                let outputFileURL = self.getDocumentsDirectory().appendingPathComponent(UUID().uuidString + ".mov")
+                self.cleanupFileManagerToSaveNewFile(outputFileURL: outputFileURL)
+                self.movieFileOutput.startRecording(to: outputFileURL, recordingDelegate: self)
                 DispatchQueue.main.async {
                     self.startTimer()
                 }
@@ -367,30 +372,43 @@ extension CameraViewModel: AVCaptureFileOutputRecordingDelegate {
     
     /// - Tag: DidFinishRecording
     public func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        saveMovieToCoreData(url: outputFileURL)
-    }
-    
-    private func saveMovieToCoreData(url: URL) {
-        guard let moc = moc else { return }
         do {
-            let data = try Data(contentsOf: url)
-            let media = CapturedMedia(context: moc)
-            let asset = AVURLAsset(url: url)
+            let asset = AVURLAsset(url: outputFileURL)
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             let thumbnailCGImage = try imageGenerator.copyCGImage(at: CMTimeMake(value: 1, timescale: 60), actualTime: nil)
-            let thumbnailUIImage = getUIImageFromCGImage(cgImage: thumbnailCGImage)
-            media.id = UUID()
-            media.movie = data
-            media.image = thumbnailUIImage.jpegData(compressionQuality: 1.0)
-            media.capturedDate = Date()
-            try moc.save()
+            guard let thumbnailData = getUIImageFromCGImage(cgImage: thumbnailCGImage).jpegData(compressionQuality: 1.0) else { return }
+            self.saveMovieToCoreData(fileURL: outputFileURL, thumbnailData: thumbnailData)
         } catch {
-            print("Error saving movie to core data: \(error)")
+            print("Error at fileOutput func: \(error)")
         }
     }
     
-    public func saveMovieToCameraRoll(url: URL, error: Error?, completion: @escaping (_ didSave: Bool) -> Void) {
+    private func saveMovieToCoreData(fileURL: URL, thumbnailData: Data) {
+        guard let moc = moc else { return }
+        
+        do {
+            let media = CapturedMedia(context: moc)
+            media.id = UUID()
+            media.videoPath = fileURL.lastPathComponent
+            media.image = thumbnailData
+            media.capturedDate = Date()
+            try moc.save()
+        } catch {
+            print(error.localizedDescription)
+        }
+    }
+    
+    public func getDocumentsDirectory() -> URL {
+        // find all possible documents directories for this user
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        // just send back the first one, which ought to be the only one
+        return paths[0]
+    }
+    
+    public func saveMovieToCameraRoll(url: URL, error: Error?) {
         var success = true
+        
+
         if let error = error {
             print("Movie file finishing error: \(String(describing: error))")
             success = ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as AnyObject).boolValue
@@ -414,7 +432,6 @@ extension CameraViewModel: AVCaptureFileOutputRecordingDelegate {
                     print("Couldn't save the movie to your photo library: \(String(describing: error))")
                 }
                 self.cleanupFileManagerToSaveNewFile(outputFileURL: url)
-                completion(success)
             })
         }
     }

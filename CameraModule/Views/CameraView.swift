@@ -103,7 +103,7 @@ struct CameraView: View {
                     .font(.system(size: 19, weight: .semibold, design: .monospaced))
                     .padding(.horizontal, spacing)
                     .padding(.vertical, spacing / 3)
-                    .background(Color.black.opacity(0.4))
+                    .background(Color.black.opacity(isNotchDevice ? 0.0 : 0.4))
                     .foregroundColor(.white)
                     .cornerRadius(spacing / 2)
                     .padding(spacing / 2)
@@ -151,7 +151,7 @@ struct CameraView: View {
                 .foregroundColor(.yellow)
         }
         .padding(.vertical, isNotchDevice ? spacing : 0)
-        .opacity(cvm.isCapturingPhoto || cvm.isRecording ? 0.0 : 1.0)
+        .opacity(cvm.isRecording ? 0.0 : 1.0)
     }
     var bottomInteractionButtons: some View {
         HStack(alignment: .center, spacing: spacing) {

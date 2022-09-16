@@ -4,7 +4,7 @@
         <attribute name="capturedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="image" optional="YES" attributeType="Binary"/>
-        <attribute name="movie" optional="YES" attributeType="Binary"/>
+        <attribute name="videoPath" optional="YES" attributeType="String"/>
     </entity>
     <elements>
         <element name="CapturedMedia" positionX="-63" positionY="-18" width="128" height="103"/>

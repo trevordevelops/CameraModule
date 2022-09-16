@@ -35,7 +35,7 @@ struct CustomVideoPlayer: UIViewControllerRepresentable {
             self.parent = parent
         }
         
-        @objc func restartPlayback () {
+        @objc func restartPlayback() {
             self.parent.player.seek(to: .zero)
         }
     }
